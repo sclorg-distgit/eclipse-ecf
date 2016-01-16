@@ -14,7 +14,7 @@
 
 Name:           %{?scl_prefix}eclipse-ecf
 Version:        3.10.0
-Release:        4.2.bs2%{?dist}
+Release:        4.2%{?dist}
 Summary:        Eclipse Communication Framework (ECF) Eclipse plug-in
 
 License:        EPL
