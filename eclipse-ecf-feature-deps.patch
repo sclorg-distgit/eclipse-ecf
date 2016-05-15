@@ -1,0 +1,41 @@
+--- features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml.orig	2016-03-15 12:16:43.331358322 +0000
++++ features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml	2016-03-15 12:18:02.362383644 +0000
+@@ -34,32 +34,11 @@
+          version="0.0.0"
+          unpack="false"/>
+ 
+-   <plugin
+-         id="org.apache.commons.codec"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
+-
+-   <plugin
+-         id="org.apache.commons.logging"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
+-
+-   <plugin
+-         id="org.apache.httpcomponents.httpclient"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
+-
+-   <plugin
+-         id="org.apache.httpcomponents.httpcore"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
++   <requires>
++      <import plugin="org.apache.commons.codec" />
++      <import plugin="org.apache.commons.logging" />
++      <import plugin="org.apache.httpcomponents.httpclient" />
++      <import plugin="org.apache.httpcomponents.httpcore" />
++   </requires>
+ 
+ </feature>
