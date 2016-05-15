@@ -2,6 +2,8 @@
 %{!?scl:%global pkg_name %{name}}
 %{?java_common_find_provides_and_requires}
 
+%global baserelease 1
+
 # The core sub-package must be archful because it is required to be in
 # libdir by the platform, but we have no natives, so suppress debuginfo
 %global debug_package %{nil}
@@ -10,19 +12,28 @@
 # bootstrapping
 %global __requires_exclude .*org\.eclipse\.equinox.*
 
-%global git_tag R-Release_HEAD-sdk_feature-152_2015-05-12_17-22-37
+%global git_tag R-Release_HEAD-sdk_feature-235_235
+
+%if 0%{?fedora} >= 24
+%global droplets droplets
+%else
+%global droplets dropins
+%endif
 
 Name:           %{?scl_prefix}eclipse-ecf
-Version:        3.10.0
-Release:        4.2%{?dist}
+Version:        3.12.2
+Release:        2.%{baserelease}%{?dist}
 Summary:        Eclipse Communication Framework (ECF) Eclipse plug-in
 
 License:        EPL
 URL:            http://www.eclipse.org/ecf/
-Source0:        http://git.eclipse.org/c/ecf/org.eclipse.ecf.git/snapshot/org.eclipse.ecf-%{git_tag}.tar.bz2
+Source0:        http://git.eclipse.org/c/ecf/org.eclipse.ecf.git/snapshot/org.eclipse.ecf-%{git_tag}.tar.xz
 
+# Change how feature deps are specified, to avoid embedding versions
+Patch0:         eclipse-ecf-feature-deps.patch
 
-BuildRequires:  %{?scl_prefix}eclipse-pde
+BuildRequires:  %{?scl_prefix}tycho >= 0.23.0
+BuildRequires:  %{?scl_prefix}eclipse-filesystem
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-client
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-core
 BuildRequires:  %{?scl_prefix_java_common}apache-commons-codec
@@ -35,14 +46,16 @@ compliant implementation of the OSGi Remote Services standard.
 
 %package   core
 Summary:   Eclipse ECF Core
-
 Requires:  %{?scl_prefix}eclipse-filesystem
+Requires:  %{?scl_prefix_java_common}httpcomponents-client
+Requires:  %{?scl_prefix_java_common}httpcomponents-core
 
 %description core
 ECF bundles required by eclipse-platform.
 
 %prep
 %{?scl:scl enable %{scl_maven} %{scl} - << "EOF"}
+set -e -x
 %setup -q -n org.eclipse.ecf-%{git_tag}
 
 find . -type f -name "*.jar" -exec rm {} \;
@@ -67,71 +80,116 @@ cp -r providers/bundles/org.eclipse.ecf.provider.filetransfer{,.ssl} ecf/plugins
 cp -r providers/bundles/org.eclipse.ecf.provider.filetransfer.httpclient4{,.ssl} ecf/plugins
 
 rm -rf `ls | grep -v "ecf"`
+mv ecf/* . && rm -r ecf
 
-# Orbit deps for PDE build
-mkdir -p deps
-build-jar-repository -s -p deps \
-  httpcomponents/httpclient httpcomponents/httpcore commons-codec commons-logging
+%patch0
 
 # Allow building on java > 1.4
-sed -i -e 's#(Object) ((URIID) o)#((URIID) o)#g' ecf/plugins/org.eclipse.ecf.identity/src/org/eclipse/ecf/core/identity/URIID.java
+sed -i -e 's#(Object) ((URIID) o)#((URIID) o)#g' plugins/org.eclipse.ecf.identity/src/org/eclipse/ecf/core/identity/URIID.java
 
 # Compatibility with httpcomponents >= 4.4.0
 sed -i '/httpcomponents/s/,4.4)/,5)/' $(find -name *.MF)
+
+# Generate pom.xml
+xmvn -o org.eclipse.tycho:tycho-pomgenerator-plugin:generate-poms -DgroupId=org.eclipse.ecf
+
+%mvn_package "::pom::" __noinstall
 %{?scl:EOF}
 
 
 %build
 %{?scl:scl enable %{scl_maven} %{scl} - << "EOF"}
-OPTIONS="-DforceContextQualifier=$(date +v%Y%m%d-%H00)"
-
-eclipse-pdebuild -f org.eclipse.ecf.core.feature -j "$OPTIONS" -o `pwd`/deps
-eclipse-pdebuild -f org.eclipse.ecf.core.ssl.feature -j "$OPTIONS" -o `pwd`/deps
-eclipse-pdebuild -f org.eclipse.ecf.filetransfer.feature -j "$OPTIONS" -o `pwd`/deps
-eclipse-pdebuild -f org.eclipse.ecf.filetransfer.ssl.feature -j "$OPTIONS" -o `pwd`/deps
-eclipse-pdebuild -f org.eclipse.ecf.filetransfer.httpclient4.feature -j "$OPTIONS" -o `pwd`/deps
-eclipse-pdebuild -f org.eclipse.ecf.filetransfer.httpclient4.ssl.feature -j "$OPTIONS" -o `pwd`/deps
+set -e -x
+%mvn_build -j -- -DforceContextQualifier=$(date -u +v%Y%m%d-%H00)
 %{?scl:EOF}
 
 
 %install
 %{?scl:scl enable %{scl_maven} %{scl} - << "EOF"}
-install -d -m 755 %{buildroot}%{_libdir}/eclipse/{features,plugins}
+set -e -x
+%mvn_install
 
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.core.feature.zip
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.core.ssl.feature.zip
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.filetransfer.feature.zip
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.filetransfer.ssl.feature.zip
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.filetransfer.httpclient4.feature.zip
-unzip -q -n -d %{buildroot}%{_libdir} build/rpmBuild/org.eclipse.ecf.filetransfer.httpclient4.ssl.feature.zip
+# Move to libdir due to being part of core platform
+install -d -m 755 %{buildroot}%{_libdir}/eclipse
+mv %{buildroot}%{_datadir}/eclipse/%{droplets}/ecf/eclipse/{plugins,features} %{buildroot}%{_libdir}/eclipse
+rm -r %{buildroot}%{_datadir}/eclipse
 
-mkdir -p %{buildroot}%{_javadir}/eclipse
+# Fixup metadata
+sed -i -e 's|%{_datadir}/eclipse/%{droplets}/ecf/eclipse|%{_libdir}/eclipse|' %{buildroot}%{_datadir}/maven-metadata/eclipse-ecf.xml
+sed -i -e 's|%{_datadir}/eclipse/%{droplets}/ecf/eclipse/features/|%{_libdir}/eclipse/features/|' \
+       -e 's|%{_datadir}/eclipse/%{droplets}/ecf/eclipse/plugins/|%{_libdir}/eclipse/plugins/|' .mfiles
+sed -i -e '/%{droplets}/d' .mfiles
 
 # Symlink jars into javadir
+install -d -m 755 %{buildroot}%{_javadir}/eclipse
+location=%{_libdir}/eclipse/plugins
+while [ "$location" != "/" ] ; do
+    location=$(dirname $location)
+    updir="$updir../"
+done
 pushd %{buildroot}%{_javadir}/eclipse
 for J in ecf{,.identity,.ssl,.filetransfer,.provider.filetransfer{,.ssl,.httpclient4{,.ssl}}}  ; do
-    DIR=../../../..%{_root_libdir}/eclipse
-    [ -e "`ls $DIR/plugins/org.eclipse.${J}_*.jar`" ] && ln -s $DIR/plugins/org.eclipse.${J}_*.jar ${J}.jar
+    DIR=$updir%{_libdir}/eclipse/plugins
+    [ -e "`ls $DIR/org.eclipse.${J}_*.jar`" ] && ln -s $DIR/org.eclipse.${J}_*.jar ${J}.jar
 done
 popd
-
-# Remove stuff that will be symlinked by the platform
-rm %{buildroot}%{_libdir}/eclipse/plugins/org.apache*
 %{?scl:EOF}
 
 
-%files core
-%{_libdir}/eclipse/features/*
-%{_libdir}/eclipse/plugins/*
+%files core -f .mfiles
 %{_javadir}/eclipse/*
-%doc ecf/features/org.eclipse.ecf.core.feature/*.html
 
 %changelog
-* Wed Jul 29 2015 Mat Booth <mat.booth@redhat.com> - 3.10.0-4.2
-- Fix failure to build from source
-
-* Mon Jun 29 2015 Mat Booth <mat.booth@redhat.com> - 3.10.0-4.1
+* Sat Mar 19 2016 Mat Booth <mat.booth@redhat.com> - 3.12.2-2.1
 - Import latest from Fedora
+
+* Tue Mar 15 2016 Mat Booth <mat.booth@redhat.com> - 3.12.2-2
+- Avoid embedding versions of external deps in features. This avoids the need to
+  rebuild when a dependency changes version.
+
+* Mon Feb 29 2016 Mat Booth <mat.booth@redhat.com> - 3.12.2-1
+- Update to Mars.2 release
+
+* Mon Feb 29 2016 Mat Booth <mat.booth@redhat.com> - 3.12.0-1.2
+- Rebuild 2016-02-29
+
+* Mon Feb 29 2016 Mikolaj Izdebski <mizdebsk@redhat.com> - 3.12.0-3
+- Rebuild for httpcomponents-client 4.5.2
+
+* Wed Feb 03 2016 Fedora Release Engineering <releng@fedoraproject.org> - 3.12.0-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_24_Mass_Rebuild
+
+* Tue Jan 12 2016 Mat Booth <mat.booth@redhat.com> - 3.12.0-1.1
+- Import latest from Fedora
+
+* Mon Dec 07 2015 Mat Booth <mat.booth@redhat.com> - 3.12.0-1
+- Update to latest release
+
+* Mon Nov  2 2015 Mikolaj Izdebski <mizdebsk@redhat.com> - 3.11.0-2
+- Rebuild for httpcomponents-core-4.4.4 update
+
+* Mon Sep 28 2015 Mat Booth <mat.booth@redhat.com> - 3.11.0-1
+- Update to latest upstream release
+
+* Wed Sep 16 2015 Mikolaj Izdebski <mizdebsk@redhat.com> - 3.10.1-5
+- Rebuild for httpcomponents-client-4.5.1 update
+
+* Wed Sep  9 2015 Mikolaj Izdebski <mizdebsk@redhat.com> - 3.10.1-4
+- Rebuild for httpcomponents-core-4.4.3 update
+
+* Mon Sep 07 2015 Michael Simacek <msimacek@redhat.com> - 3.10.1-3
+- Rebuild for httpcomponents-core-4.4.2
+
+* Mon Aug 31 2015 Roland Grunberg <rgrunber@redhat.com> - 3.10.1-2
+- Minor changes to build as a droplet.
+
+* Tue Aug 25 2015 Mat Booth <mat.booth@redhat.com> - 3.10.1-1
+- Update to latest upstream version
+- Use XZ compressed tarball
+- Make symlink generation more dynamic
+
+* Wed Aug 05 2015 Mat Booth <mat.booth@redhat.com> - 3.10.0-5
+- Rebuilt using xmvn/tycho
 
 * Mon Jun 29 2015 Mat Booth <mat.booth@redhat.com> - 3.10.0-4
 - Drop incomplete and forbidden SCL macros
