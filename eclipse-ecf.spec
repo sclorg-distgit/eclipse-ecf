@@ -2,7 +2,7 @@
 %{!?scl:%global pkg_name %{name}}
 %{?java_common_find_provides_and_requires}
 
-%global baserelease 2
+%global baserelease 3
 
 # The core sub-package must be archful because it is required to be in
 # libdir by the platform, but we have no natives, so suppress debuginfo
@@ -161,6 +161,9 @@ popd
 %files runtime -f .mfiles-runtime
 
 %changelog
+* Thu Jul 28 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.3
+- Rebuild against bootstrapped Eclipse
+
 * Wed Jul 27 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.2
 - Always use droplets
 - Avoid unnecessary symlinks before Eclipse is bootstrapped
