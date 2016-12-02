@@ -1,5 +1,5 @@
---- features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml.orig	2016-03-15 12:16:43.331358322 +0000
-+++ features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml	2016-03-15 12:18:02.362383644 +0000
+--- releng/features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml.orig	2016-03-15 12:16:43.331358322 +0000
++++ releng/features/org.eclipse.ecf.filetransfer.httpclient4.feature/feature.xml	2016-03-15 12:18:02.362383644 +0000
 @@ -34,32 +34,11 @@
           version="0.0.0"
           unpack="false"/>
@@ -37,5 +37,29 @@
 +      <import plugin="org.apache.httpcomponents.httpclient" />
 +      <import plugin="org.apache.httpcomponents.httpcore" />
 +   </requires>
+ 
+ </feature>
+--- releng/features/org.eclipse.ecf.discovery.dnssd.feature/feature.xml.orig	2016-09-15 16:17:49.933927862 +0100
++++ releng/features/org.eclipse.ecf.discovery.dnssd.feature/feature.xml	2016-09-15 16:19:27.324810394 +0100
+@@ -27,6 +27,7 @@
+ 
+    <requires>
+       <import feature="org.eclipse.ecf.discovery.feature" version="1.0.0" match="compatible"/>
++      <import plugin="org.xbill.dns"/>
+    </requires>
+ 
+    <plugin
+@@ -34,13 +35,6 @@
+          download-size="0"
+          install-size="0"
+          version="0.0.0"
+-         unpack="false"/>
+-
+-   <plugin
+-         id="org.xbill.dns"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+          unpack="false"/>
  
  </feature>

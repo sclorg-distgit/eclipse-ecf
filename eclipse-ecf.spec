@@ -2,7 +2,7 @@
 %{!?scl:%global pkg_name %{name}}
 %{?java_common_find_provides_and_requires}
 
-%global baserelease 3
+%global baserelease 2
 
 # The core sub-package must be archful because it is required to be in
 # libdir by the platform, but we have no natives, so suppress debuginfo
@@ -12,12 +12,10 @@
 # bootstrapping
 %global __requires_exclude .*org\.eclipse\.equinox.*
 
-%global git_tag R-Release_HEAD-sdk_feature-272_272
-
-%global droplets droplets
+%global git_tag R-Release_HEAD-sdk_feature-279_279
 
 Name:           %{?scl_prefix}eclipse-ecf
-Version:        3.13.1
+Version:        3.13.2
 Release:        1.%{baserelease}%{?dist}
 Summary:        Eclipse Communication Framework (ECF) Eclipse plug-in
 
@@ -27,8 +25,11 @@ Source0:        http://git.eclipse.org/c/ecf/org.eclipse.ecf.git/snapshot/org.ec
 
 # Change how feature deps are specified, to avoid embedding versions
 Patch0:         eclipse-ecf-feature-deps.patch
+Patch1:         eclipse-ecf-tycho.patch
 
-BuildRequires:  %{?scl_prefix}tycho >= 0.23.0
+BuildRequires:  %{?scl_prefix}tycho
+BuildRequires:  %{?scl_prefix}tycho-extras
+BuildRequires:  %{?scl_prefix_maven}maven-plugin-build-helper
 BuildRequires:  %{?scl_prefix}eclipse-filesystem
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-client
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-core
@@ -59,6 +60,15 @@ ECF is a set of frameworks for building communications into applications and
 services. It provides a lightweight, modular, transport-independent, fully
 compliant implementation of the OSGi Remote Services standard.
 
+%package   sdk
+Summary:   Eclipse ECF SDK
+
+BuildArch: noarch
+
+%description sdk
+Documentation and developer resources for the Eclipse Communication Framework
+(ECF) plug-in.
+
 %prep
 %{?scl:scl enable %{scl_maven} %{scl} - << "EOF"}
 set -e -x
@@ -67,42 +77,27 @@ set -e -x
 find . -type f -name "*.jar" -exec rm {} \;
 find . -type f -name "*.class" -exec rm {} \;
 
-#get just the bits we need
-mkdir -p ecf/plugins
-mkdir -p ecf/features
-
-cp -pr releng/features/org.eclipse.ecf.core.{,ssl.}feature \
-       releng/features/org.eclipse.ecf.filetransfer.httpclient4.{,ssl.}feature \
-       releng/features/org.eclipse.ecf.filetransfer.{,ssl.}feature \
-       releng/features/org.eclipse.ecf.discovery.feature \
-  ecf/features
-
-cp -r framework/bundles/org.eclipse.ecf ecf/plugins
-cp -r framework/bundles/org.eclipse.ecf.identity ecf/plugins
-cp -r framework/bundles/org.eclipse.ecf.ssl ecf/plugins
-cp -r framework/bundles/org.eclipse.ecf.filetransfer ecf/plugins
-cp -r providers/bundles/org.eclipse.ecf.provider.filetransfer{,.ssl} ecf/plugins
-cp -r providers/bundles/org.eclipse.ecf.provider.filetransfer.httpclient4{,.ssl} ecf/plugins
-cp -r framework/bundles/org.eclipse.ecf.discovery ecf/plugins
-cp -r providers/bundles/org.eclipse.ecf.provider.discovery ecf/plugins
-
-rm -rf `ls | grep -v "ecf"`
-mv ecf/* . && rm -r ecf
-
 %patch0
+%patch1 -p1
 
 # Allow building on java > 1.4
-sed -i -e 's#(Object) ((URIID) o)#((URIID) o)#g' plugins/org.eclipse.ecf.identity/src/org/eclipse/ecf/core/identity/URIID.java
+sed -i -e 's#(Object) ((URIID) o)#((URIID) o)#g' framework/bundles/org.eclipse.ecf.identity/src/org/eclipse/ecf/core/identity/URIID.java
 
-# Compatibility with httpcomponents >= 4.4.0
-sed -i '/httpcomponents/s/,4.4)/,5)/' $(find -name *.MF)
+# Don't use target platform or jgit packaging bits
+%pom_xpath_remove "pom:target"
+%pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:dependencies"
+%pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:configuration/pom:sourceReferences"
+%pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:configuration/pom:timestampProvider"
 
-# Generate pom.xml
-xmvn -o org.eclipse.tycho:tycho-pomgenerator-plugin:generate-poms -DgroupId=org.eclipse.ecf
-%pom_add_plugin org.eclipse.tycho:tycho-compiler-plugin plugins/org.eclipse.ecf.provider.filetransfer.httpclient4 \
-  "<configuration><compilerArgument>-warn:+discouraged,forbidden</compilerArgument></configuration>"
+# Using latest zookeeper requires non-trivial port
+%pom_disable_module releng/features/org.eclipse.ecf.discovery.zookeeper.feature
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.zookeeper
+# Unavailable dep on dnsjava
+%pom_disable_module releng/features/org.eclipse.ecf.discovery.dnssd.feature
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.dnssd
 
-%mvn_package "::pom::" __noinstall
+%mvn_package "::{pom,target}::" __noinstall
+%mvn_package "::jar:{sources,sources-feature}:" sdk
 %mvn_package ":org.eclipse.ecf.core.{,ssl.}feature" core
 %mvn_package ":org.eclipse.ecf.filetransfer.{,httpclient4.}{,ssl.}feature" core
 %mvn_package ":org.eclipse.ecf{,.identity,.ssl,.filetransfer}" core
@@ -114,7 +109,9 @@ xmvn -o org.eclipse.tycho:tycho-pomgenerator-plugin:generate-poms -DgroupId=org.
 %build
 %{?scl:scl enable %{scl_maven} %{scl} - << "EOF"}
 set -e -x
-%mvn_build -j -- -DforceContextQualifier=$(date -u +v%Y%m%d-1000)
+# Qualifier generated from last modification time of source tarball
+QUALIFIER=$(date -u -d"$(stat --format=%y %{SOURCE0})" +v%Y%m%d-%H%M)
+%mvn_build -j -- -DforceContextQualifier=$QUALIFIER
 %{?scl:EOF}
 
 
@@ -125,19 +122,14 @@ set -e -x
 
 # Move to libdir due to being part of core platform
 install -d -m 755 %{buildroot}%{_libdir}/eclipse
-mv %{buildroot}%{_datadir}/eclipse/%{droplets}/ecf-core/eclipse/{plugins,features} %{buildroot}%{_libdir}/eclipse
-rm -r %{buildroot}%{_datadir}/eclipse/%{droplets}/ecf-core
+mv %{buildroot}%{_datadir}/eclipse/droplets/ecf-core/eclipse/{plugins,features} %{buildroot}%{_libdir}/eclipse
+rm -r %{buildroot}%{_datadir}/eclipse/droplets/ecf-core
 
 # Fixup metadata
-sed -i -e 's|%{_datadir}/eclipse/%{droplets}/ecf-core/eclipse|%{_libdir}/eclipse|' %{buildroot}%{_datadir}/maven-metadata/eclipse-ecf-core.xml
-sed -i -e 's|%{_datadir}/eclipse/%{droplets}/ecf-core/eclipse/features/|%{_libdir}/eclipse/features/|' \
-       -e 's|%{_datadir}/eclipse/%{droplets}/ecf-core/eclipse/plugins/|%{_libdir}/eclipse/plugins/|' .mfiles-core
-sed -i -e '/%{droplets}/d' .mfiles-core
-
-for del in $( (cd %{buildroot}%{_libdir}/eclipse/plugins && ls | grep -v -e '^org\.eclipse\.ecf' ) ) ; do
-rm %{buildroot}%{_libdir}/eclipse/plugins/$del
-sed -i -e "/$del/d" .mfiles-core
-done
+sed -i -e 's|%{_datadir}/eclipse/droplets/ecf-core/eclipse|%{_libdir}/eclipse|' %{buildroot}%{_datadir}/maven-metadata/eclipse-ecf-core.xml
+sed -i -e 's|%{_datadir}/eclipse/droplets/ecf-core/eclipse/features/|%{_libdir}/eclipse/features/|' \
+       -e 's|%{_datadir}/eclipse/droplets/ecf-core/eclipse/plugins/|%{_libdir}/eclipse/plugins/|' .mfiles-core
+sed -i -e '/droplets/d' .mfiles-core
 
 # Symlink jars into javadir
 install -d -m 755 %{buildroot}%{_javadir}/eclipse
@@ -160,7 +152,21 @@ popd
 
 %files runtime -f .mfiles-runtime
 
+%files sdk -f .mfiles-sdk
+
 %changelog
+* Tue Sep 20 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1.2
+- Drop unavailable dep on dnsjava
+
+* Tue Sep 20 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1.1
+- Auto SCL-ise package for rh-eclipse46 collection
+
+* Wed Sep 14 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1
+- Update to latest release
+- Set qualifiers to source-modification-time instead of build-time, to
+  eliminate descrepancies between architectures
+- Add SDK package for sources
+
 * Thu Jul 28 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.3
 - Rebuild against bootstrapped Eclipse
 
