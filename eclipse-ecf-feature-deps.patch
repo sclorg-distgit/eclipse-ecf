@@ -63,3 +63,61 @@
           unpack="false"/>
  
  </feature>
+--- releng/features/org.eclipse.ecf.remoteservice.rosgi.feature/feature.xml.orig	2016-12-04 06:16:14.000000000 +0000
++++ releng/features/org.eclipse.ecf.remoteservice.rosgi.feature/feature.xml	2017-01-04 12:03:11.312697101 +0000
+@@ -30,6 +30,7 @@
+    <requires>
+       <import feature="org.eclipse.ecf.provider.generic.feature" version="1.0" match="compatible"/>
+       <import feature="org.eclipse.ecf.remoteservice.feature" version="2.1" match="compatible"/>
++      <import plugin="org.objectweb.asm" version="5.0" match="compatible"/>
+    </requires>
+ 
+    <plugin
+@@ -46,11 +47,4 @@
+          version="0.0.0"
+          unpack="false"/>
+ 
+-   <plugin
+-         id="org.objectweb.asm"
+-         download-size="0"
+-         install-size="0"
+-         version="5.0.1.v201404251740"
+-         unpack="false"/>
+-
+ </feature>
+--- releng/features/org.eclipse.ecf.remoteservice.servlet.feature/feature.xml.orig	2016-12-04 06:16:14.000000000 +0000
++++ releng/features/org.eclipse.ecf.remoteservice.servlet.feature/feature.xml	2017-01-04 12:05:48.238868061 +0000
+@@ -48,11 +48,4 @@
+          version="0.0.0"
+          unpack="false"/>
+ 
+-   <plugin
+-         id="javax.servlet"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
+-
+ </feature>
+--- releng/features/org.eclipse.ecf.xmpp.feature/feature.xml.orig	2017-01-04 12:35:24.342531553 +0000
++++ releng/features/org.eclipse.ecf.xmpp.feature/feature.xml	2017-01-04 12:36:03.274095480 +0000
+@@ -30,6 +30,7 @@
+       <import feature="org.eclipse.ecf.presence.feature" version="1.0" match="compatible"/>
+       <import feature="org.eclipse.ecf.datashare.feature" version="1.0" match="compatible"/>
+       <import feature="org.eclipse.ecf.remoteservice.feature" version="2.1" match="compatible"/>
++      <import plugin="org.xbill.dns"/>
+    </requires>
+ 
+    <plugin
+@@ -62,11 +63,4 @@
+          fragment="true"
+          unpack="false"/>
+ 
+-   <plugin
+-         id="org.xbill.dns"
+-         download-size="0"
+-         install-size="0"
+-         version="0.0.0"
+-         unpack="false"/>
+-
+ </feature>

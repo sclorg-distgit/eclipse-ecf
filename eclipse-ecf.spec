@@ -12,10 +12,10 @@
 # bootstrapping
 %global __requires_exclude .*org\.eclipse\.equinox.*
 
-%global git_tag R-Release_HEAD-sdk_feature-279_279
+%global git_tag R-Release_HEAD-sdk_feature-3.13.3-Hipp-Tycho-49
 
 Name:           %{?scl_prefix}eclipse-ecf
-Version:        3.13.2
+Version:        3.13.3
 Release:        1.%{baserelease}%{?dist}
 Summary:        Eclipse Communication Framework (ECF) Eclipse plug-in
 
@@ -25,12 +25,15 @@ Source0:        http://git.eclipse.org/c/ecf/org.eclipse.ecf.git/snapshot/org.ec
 
 # Change how feature deps are specified, to avoid embedding versions
 Patch0:         eclipse-ecf-feature-deps.patch
-Patch1:         eclipse-ecf-tycho.patch
 
 BuildRequires:  %{?scl_prefix}tycho
 BuildRequires:  %{?scl_prefix}tycho-extras
 BuildRequires:  %{?scl_prefix_maven}maven-plugin-build-helper
 BuildRequires:  %{?scl_prefix}eclipse-filesystem
+BuildRequires:  %{?scl_prefix}eclipse-emf-runtime
+BuildRequires:  %{?scl_prefix}eclipse-pde
+BuildRequires:  %{?scl_prefix}osgi-annotation
+BuildRequires:  %{?scl_prefix_java_common}xpp3-minimal
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-client
 BuildRequires:  %{?scl_prefix_java_common}httpcomponents-core
 BuildRequires:  %{?scl_prefix_java_common}apache-commons-codec
@@ -78,26 +81,74 @@ find . -type f -name "*.jar" -exec rm {} \;
 find . -type f -name "*.class" -exec rm {} \;
 
 %patch0
-%patch1 -p1
 
 # Allow building on java > 1.4
 sed -i -e 's#(Object) ((URIID) o)#((URIID) o)#g' framework/bundles/org.eclipse.ecf.identity/src/org/eclipse/ecf/core/identity/URIID.java
+
+# Correction for content of runtime package
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.presence']" releng/features/org.eclipse.ecf.core/feature.xml
+
+# Don't build examples or tests
+sed -i -e '/<module>examples/d' -e '/<module>tests/d' pom.xml
+%pom_disable_module releng/features/org.eclipse.ecf.tests.feature
+%pom_disable_module releng/features/org.eclipse.ecf.eventadmin.examples.feature
+%pom_disable_module releng/features/org.eclipse.ecf.remoteservice.examples.feature
+%pom_disable_module releng/features/org.eclipse.ecf.remoteservice.sdk.examples.feature
+%pom_xpath_remove "feature/requires/import[@feature='org.eclipse.ecf.remoteservice.sdk.examples.feature']" releng/features/org.eclipse.ecf.core/feature.xml
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.example.clients']" releng/features/org.eclipse.ecf.core/feature.xml
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.example.collab']" releng/features/org.eclipse.ecf.core/feature.xml
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.example.collab.editor']" releng/features/org.eclipse.ecf.core/feature.xml
 
 # Don't use target platform or jgit packaging bits
 %pom_xpath_remove "pom:target"
 %pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:dependencies"
 %pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:configuration/pom:sourceReferences"
 %pom_xpath_remove "pom:plugin[pom:artifactId='tycho-packaging-plugin']/pom:configuration/pom:timestampProvider"
+%pom_disable_module releng/org.eclipse.ecf.releng.repository
+
+# Remove unnecesary dep on json
+%pom_xpath_remove "feature/requires/import[@plugin='org.json']" releng/features/org.eclipse.ecf.remoteservice.rest.feature/feature.xml
 
 # Using latest zookeeper requires non-trivial port
 %pom_disable_module releng/features/org.eclipse.ecf.discovery.zookeeper.feature
 %pom_disable_module providers/bundles/org.eclipse.ecf.provider.zookeeper
-# Unavailable dep on dnsjava
+%pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.discovery.zookeeper.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
+
+# Using latest rome requires non-trivial port
+%pom_disable_module releng/features/org.eclipse.ecf.remoteservice.rest.synd.feature
+%pom_disable_module framework/bundles/org.eclipse.ecf.remoteservice.rest.synd
+%pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.remoteservice.rest.synd.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
+
+# Use system libs
+ln -s %{_javadir}/osgi-annotation/osgi.annotation.jar osgi/bundles/org.eclipse.osgi.services.remoteserviceadmin/osgi/
+ln -s %{_javadir}/xpp3-minimal.jar protocols/bundles/org.jivesoftware.smack/jars/xpp.jar
+ln -s %{_javadir}/irclib.jar providers/bundles/org.eclipse.ecf.provider.irc/lib
+
+# Unavailable dep on dnsjava, smack, irclib
 %pom_disable_module releng/features/org.eclipse.ecf.discovery.dnssd.feature
 %pom_disable_module providers/bundles/org.eclipse.ecf.provider.dnssd
+%pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.discovery.dnssd.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
+%pom_disable_module protocols/bundles/org.jivesoftware.smack
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.xmpp.datashare
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.xmpp
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.xmpp.remoteservice
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.xmpp.ui
+%pom_disable_module releng/features/org.eclipse.ecf.xmpp.feature
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.provider.xmpp.ui']" releng/features/org.eclipse.ecf.core/feature.xml
+%pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.xmpp.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.irc
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.irc.ui
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.provider.irc']" releng/features/org.eclipse.ecf.core/feature.xml
+%pom_xpath_remove "feature/plugin[@id='org.eclipse.ecf.provider.irc.ui']" releng/features/org.eclipse.ecf.core/feature.xml
 
 %mvn_package "::{pom,target}::" __noinstall
 %mvn_package "::jar:{sources,sources-feature}:" sdk
+%mvn_package ":org.eclipse.ecf.{core,sdk}" sdk
+%mvn_package ":org.eclipse.ecf.docshare*" sdk
+for p in $(grep '<plugin' releng/features/org.eclipse.ecf.core/feature.xml | sed -e 's/.*id="\(.*\)" d.*/\1/') ; do
+%mvn_package ":$p" sdk
+done
+%mvn_package ":org.eclipse.ecf.remoteservice.sdk.*" sdk
 %mvn_package ":org.eclipse.ecf.core.{,ssl.}feature" core
 %mvn_package ":org.eclipse.ecf.filetransfer.{,httpclient4.}{,ssl.}feature" core
 %mvn_package ":org.eclipse.ecf{,.identity,.ssl,.filetransfer}" core
@@ -155,27 +206,20 @@ popd
 %files sdk -f .mfiles-sdk
 
 %changelog
-* Tue Sep 20 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1.2
-- Drop unavailable dep on dnsjava
+* Mon Jan 16 2017 Mat Booth <mat.booth@redhat.com> - 3.13.3-1.2
+- Drop unavailable deps
 
-* Tue Sep 20 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1.1
+* Mon Jan 16 2017 Mat Booth <mat.booth@redhat.com> - 3.13.3-1.1
 - Auto SCL-ise package for rh-eclipse46 collection
+
+* Tue Jan 03 2017 Mat Booth <mat.booth@redhat.com> - 3.13.3-1
+- Update to latest release
 
 * Wed Sep 14 2016 Mat Booth <mat.booth@redhat.com> - 3.13.2-1
 - Update to latest release
 - Set qualifiers to source-modification-time instead of build-time, to
   eliminate descrepancies between architectures
 - Add SDK package for sources
-
-* Thu Jul 28 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.3
-- Rebuild against bootstrapped Eclipse
-
-* Wed Jul 27 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.2
-- Always use droplets
-- Avoid unnecessary symlinks before Eclipse is bootstrapped
-
-* Wed Jul 27 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1.1
-- Auto SCL-ise package for rh-eclipse46 collection
 
 * Fri Apr 15 2016 Mat Booth <mat.booth@redhat.com> - 3.13.1-1
 - Update to latest release
