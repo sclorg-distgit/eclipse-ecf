@@ -2,7 +2,7 @@
 %{!?scl:%global pkg_name %{name}}
 %{?java_common_find_provides_and_requires}
 
-%global baserelease 2
+%global baserelease 3
 
 # The core sub-package must be archful because it is required to be in
 # libdir by the platform, but we have no natives, so suppress debuginfo
@@ -125,6 +125,10 @@ ln -s %{_javadir}/xpp3-minimal.jar protocols/bundles/org.jivesoftware.smack/jars
 ln -s %{_javadir}/irclib.jar providers/bundles/org.eclipse.ecf.provider.irc/lib
 
 # Unavailable dep on dnsjava, smack, irclib
+%pom_disable_module releng/features/org.eclipse.ecf.discovery.slp.feature
+%pom_disable_module providers/bundles/org.eclipse.ecf.provider.jslp
+%pom_disable_module protocols/bundles/ch.ethz.iks.slp
+%pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.discovery.slp.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
 %pom_disable_module releng/features/org.eclipse.ecf.discovery.dnssd.feature
 %pom_disable_module providers/bundles/org.eclipse.ecf.provider.dnssd
 %pom_xpath_remove "feature/includes[@id='org.eclipse.ecf.discovery.dnssd.feature']" releng/features/org.eclipse.ecf.remoteservice.sdk.feature/feature.xml
@@ -206,6 +210,9 @@ popd
 %files sdk -f .mfiles-sdk
 
 %changelog
+* Thu Mar 02 2017 Mat Booth <mat.booth@redhat.com> - 3.13.3-1.3
+- Disable SLP provider, rhbz#1416706
+
 * Mon Jan 16 2017 Mat Booth <mat.booth@redhat.com> - 3.13.3-1.2
 - Drop unavailable deps
 
